@@ -1,7 +1,12 @@
 PyQt5>=5.15.0
 Pillow>=9.0.0
 pytesseract>=0.3.10
-deep-translator>=1.11.4
 mss>=9.0.1
 numpy>=1.21.0
 pynput>=1.7.6
+
+# Offline translation dependencies
+torch>=2.0.0
+transformers>=4.30.0
+sentencepiece>=0.1.99
+protobuf>=3.20.0

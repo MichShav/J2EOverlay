@@ -7,7 +7,7 @@ echo "================================"
 echo ""
 
 # Check Python version
-echo "[1/5] Checking Python version..."
+echo "[1/6] Checking Python version..."
 python3 --version
 if [ $? -ne 0 ]; then
     echo "Error: Python 3 is not installed"
@@ -16,7 +16,7 @@ fi
 
 # Check for Tesseract
 echo ""
-echo "[2/5] Checking for Tesseract OCR..."
+echo "[2/6] Checking for Tesseract OCR..."
 if ! command -v tesseract &> /dev/null; then
     echo "Tesseract OCR is not installed."
     echo "Installing Tesseract with Japanese language support..."
@@ -39,7 +39,7 @@ fi
 
 # Create virtual environment
 echo ""
-echo "[3/5] Creating virtual environment..."
+echo "[3/6] Creating virtual environment..."
 python3 -m venv venv
 if [ $? -ne 0 ]; then
     echo "Error creating virtual environment"
@@ -48,17 +48,28 @@ fi
 
 # Activate virtual environment
 echo ""
-echo "[4/5] Activating virtual environment..."
+echo "[4/6] Activating virtual environment..."
 source venv/bin/activate
 
 # Install dependencies
 echo ""
-echo "[5/5] Installing Python dependencies..."
+echo "[5/6] Installing Python dependencies..."
 pip install --upgrade pip
 pip install -r requirements.txt
 if [ $? -ne 0 ]; then
     echo "Error installing dependencies"
     exit 1
+fi
+
+# Download translation models
+echo ""
+echo "[6/6] Downloading translation models..."
+echo "This will download ~2GB of data and may take several minutes."
+echo ""
+python download_models.py
+if [ $? -ne 0 ]; then
+    echo "Warning: Model download failed. You can try again later by running:"
+    echo "  python download_models.py"
 fi
 
 echo ""

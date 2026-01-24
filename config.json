@@ -12,7 +12,8 @@
   "translation": {
     "source_lang": "ja",
     "target_lang": "en",
-    "service": "google"
+    "service": "sugoi",
+    "model_path": ""
   },
   "overlay": {
     "font_size": 14,

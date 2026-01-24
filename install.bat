@@ -7,7 +7,7 @@ echo ================================
 echo.
 
 REM Check Python version
-echo [1/4] Checking Python version...
+echo [1/5] Checking Python version...
 python --version
 if %errorlevel% neq 0 (
     echo Error: Python is not installed or not in PATH
@@ -17,7 +17,7 @@ if %errorlevel% neq 0 (
 
 REM Check for Tesseract
 echo.
-echo [2/4] Checking for Tesseract OCR...
+echo [2/5] Checking for Tesseract OCR...
 where tesseract >nul 2>&1
 if %errorlevel% neq 0 (
     echo Tesseract OCR is not installed or not in PATH.
@@ -36,7 +36,7 @@ if %errorlevel% neq 0 (
 
 REM Create virtual environment
 echo.
-echo [3/4] Creating virtual environment...
+echo [3/5] Creating virtual environment...
 python -m venv venv
 if %errorlevel% neq 0 (
     echo Error creating virtual environment
@@ -46,7 +46,7 @@ if %errorlevel% neq 0 (
 
 REM Activate and install dependencies
 echo.
-echo [4/4] Installing Python dependencies...
+echo [4/5] Installing Python dependencies...
 call venv\Scripts\activate.bat
 python -m pip install --upgrade pip
 pip install -r requirements.txt
@@ -54,6 +54,17 @@ if %errorlevel% neq 0 (
     echo Error installing dependencies
     pause
     exit /b 1
+)
+
+REM Download translation models
+echo.
+echo [5/5] Downloading translation models...
+echo This will download ~2GB of data and may take several minutes.
+echo.
+python download_models.py
+if %errorlevel% neq 0 (
+    echo Warning: Model download failed. You can try again later by running:
+    echo   python download_models.py
 )
 
 echo.

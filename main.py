@@ -41,7 +41,8 @@ class J2EOverlayApp:
         self.translator = Translator(
             source_lang=self.config.get('translation.source_lang', 'ja'),
             target_lang=self.config.get('translation.target_lang', 'en'),
-            service=self.config.get('translation.service', 'google')
+            service=self.config.get('translation.service', 'sugoi'),
+            model_path=self.config.get('translation.model_path', '')
         )
 
         # Create overlay window

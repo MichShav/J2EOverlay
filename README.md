@@ -5,19 +5,22 @@ A transparent overlay application that translates Japanese text to English in re
 ## Features
 
 - **Real-time OCR**: Extracts Japanese text from screen using Tesseract OCR
-- **Instant Translation**: Translates Japanese to English using Google Translate
-- **Transparent Overlay**: Displays translations on top of original text
+- **Offline Translation**: Translates Japanese to English using local AI models (no internet required)
+- **Game-Optimized**: Uses models specifically tuned for Japanese game text translation
+- **Transparent Overlay**: Displays translations on top of original text with click-through support
 - **Fullscreen Compatible**: Works with fullscreen games and applications
 - **Cross-Platform**: Supports Windows 7+ and Linux
 - **Region Selection**: Capture specific screen regions
 - **Auto-Capture Mode**: Automatically scan and translate at intervals
 - **System Tray**: Minimal interface, runs in background
+- **Fast Translation**: ~200-400ms per translation on CPU, faster with GPU
 
 ## Requirements
 
 - Python 3.7 or higher
-- Tesseract OCR 4.0 or higher
-- Internet connection (for translation)
+- Tesseract OCR 4.0 or higher with Japanese language data
+- ~2-3GB disk space for translation models
+- Internet connection (one-time only, for downloading models)
 
 ## Installation
 
@@ -71,6 +74,20 @@ source venv/bin/activate
 
 pip install -r requirements.txt
 ```
+
+### 4. Download Translation Models
+
+**IMPORTANT**: This is a one-time download (~2GB) and requires internet connection. After download, the app works completely offline.
+
+```bash
+python download_models.py
+```
+
+This will download:
+- **Primary**: staka/fugumt-ja-en (game-optimized Japanese-English model)
+- **Fallback**: Helsinki-NLP/opus-mt-ja-en (if primary fails)
+
+The models are cached locally in your user directory and only need to be downloaded once.
 
 ## Usage
 
@@ -143,13 +160,15 @@ Edit `config.json` to customize settings:
 "translation": {
   "source_lang": "ja",
   "target_lang": "en",
-  "service": "google"
+  "service": "sugoi",
+  "model_path": ""
 }
 ```
 
 - `source_lang`: Source language code (ja = Japanese)
 - `target_lang`: Target language code (en = English)
-- `service`: Translation service (currently supports "google")
+- `service`: Translation service ("sugoi" for offline, "offline" also works)
+- `model_path`: Custom model path (leave empty to use default downloaded models)
 
 ### Overlay Appearance
 
@@ -222,9 +241,11 @@ which tesseract
 
 ### Translation not working
 
-- Check internet connection (required for Google Translate)
-- Verify firewall isn't blocking the application
-- Try reducing scan interval if using auto-capture
+- Ensure translation models were downloaded (run `python download_models.py`)
+- Check console output for model loading errors
+- Verify sufficient disk space (~2-3GB needed)
+- For GPU acceleration: Ensure CUDA is installed and compatible with PyTorch
+- Try restarting the application after model download
 
 ### Overlay not visible in fullscreen
 
@@ -244,10 +265,22 @@ which tesseract
 
 ## Performance Tips
 
-1. **Select specific regions** instead of full screen
-2. **Increase scan interval** for auto-capture (2000-3000ms)
-3. **Lower confidence threshold** only if needed
-4. **Close other applications** for better performance
+1. **Use GPU acceleration** - If you have an NVIDIA GPU, install CUDA for 2-4x faster translation
+2. **Select specific regions** instead of full screen
+3. **Increase scan interval** for auto-capture (2000-3000ms recommended for games)
+4. **Lower confidence threshold** only if needed
+5. **Close other applications** for better performance
+
+### GPU Acceleration (Optional)
+
+For faster translation (~100-200ms instead of 200-400ms):
+
+1. Install NVIDIA CUDA Toolkit (11.8 or newer)
+2. Install PyTorch with CUDA support:
+   ```bash
+   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+   ```
+3. Restart J2EOverlay - it will automatically use GPU if available
 
 ## Platform-Specific Notes
 
