@@ -1,0 +1,33 @@
+{
+  "hotkey": {
+    "capture": "<ctrl>+<shift>+t",
+    "toggle": "<ctrl>+<shift>+o",
+    "quit": "<ctrl>+<shift>+q"
+  },
+  "ocr": {
+    "language": "jpn",
+    "tesseract_path": "",
+    "confidence_threshold": 60
+  },
+  "translation": {
+    "source_lang": "ja",
+    "target_lang": "en",
+    "service": "google"
+  },
+  "overlay": {
+    "font_size": 14,
+    "font_family": "Arial",
+    "text_color": "#FFFFFF",
+    "background_color": "#000000",
+    "background_opacity": 0.7,
+    "border_color": "#00FF00",
+    "border_width": 2,
+    "padding": 10
+  },
+  "capture": {
+    "mode": "region",
+    "monitor": 0,
+    "auto_detect": true,
+    "scan_interval": 1000
+  }
+}

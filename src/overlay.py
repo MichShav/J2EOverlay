@@ -1,0 +1,228 @@
+"""Transparent overlay window for displaying translations"""
+
+from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QApplication
+from PyQt5.QtCore import Qt, QRect, QTimer
+from PyQt5.QtGui import QPalette, QColor, QFont, QPainter, QPen
+from typing import Optional, Tuple
+
+
+class TranslationOverlay(QWidget):
+    """Transparent overlay window that displays translated text"""
+
+    def __init__(self, config: dict):
+        super().__init__()
+        self.config = config
+        self.translation_boxes = []  # List of (rect, text) tuples
+        self._setup_window()
+
+    def _setup_window(self):
+        """Setup the overlay window properties"""
+        # Window flags for transparent, always-on-top, frameless window
+        # that works with fullscreen applications
+        self.setWindowFlags(
+            Qt.WindowStaysOnTopHint |
+            Qt.FramelessWindowHint |
+            Qt.Tool |
+            Qt.WindowTransparentForInput  # Click-through
+        )
+
+        # Set window to cover entire screen
+        screen = QApplication.primaryScreen().geometry()
+        self.setGeometry(screen)
+
+        # Make window transparent
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setAttribute(Qt.WA_TransparentForMouseEvents)
+
+        # Don't show in taskbar
+        self.setAttribute(Qt.WA_X11DoNotAcceptFocus, True)
+
+        # Set up font and colors
+        self.font = QFont(
+            self.config.get('overlay', {}).get('font_family', 'Arial'),
+            self.config.get('overlay', {}).get('font_size', 14)
+        )
+
+        self.text_color = QColor(
+            self.config.get('overlay', {}).get('text_color', '#FFFFFF')
+        )
+        self.bg_color = QColor(
+            self.config.get('overlay', {}).get('background_color', '#000000')
+        )
+        self.border_color = QColor(
+            self.config.get('overlay', {}).get('border_color', '#00FF00')
+        )
+
+        # Set background opacity
+        opacity = self.config.get('overlay', {}).get('background_opacity', 0.7)
+        self.bg_color.setAlphaF(opacity)
+
+        self.border_width = self.config.get('overlay', {}).get('border_width', 2)
+        self.padding = self.config.get('overlay', {}).get('padding', 10)
+
+    def add_translation(self, x: int, y: int, width: int, height: int, text: str):
+        """
+        Add a translation box to display
+
+        Args:
+            x, y: Top-left coordinates
+            width, height: Box dimensions
+            text: Translated text to display
+        """
+        rect = QRect(x, y, width, height)
+        self.translation_boxes.append((rect, text))
+        self.update()  # Trigger repaint
+
+    def clear_translations(self):
+        """Clear all translation boxes"""
+        self.translation_boxes.clear()
+        self.update()
+
+    def paintEvent(self, event):
+        """Custom paint event to draw translation boxes"""
+        if not self.translation_boxes:
+            return
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setFont(self.font)
+
+        for rect, text in self.translation_boxes:
+            # Draw background
+            painter.fillRect(rect, self.bg_color)
+
+            # Draw border
+            pen = QPen(self.border_color, self.border_width)
+            painter.setPen(pen)
+            painter.drawRect(rect)
+
+            # Draw text
+            painter.setPen(self.text_color)
+            text_rect = rect.adjusted(
+                self.padding,
+                self.padding,
+                -self.padding,
+                -self.padding
+            )
+            painter.drawText(
+                text_rect,
+                Qt.AlignLeft | Qt.AlignTop | Qt.TextWordWrap,
+                text
+            )
+
+    def show_translation(self, x: int, y: int, width: int, height: int, text: str, duration: int = 5000):
+        """
+        Show a translation for a specified duration
+
+        Args:
+            x, y: Top-left coordinates
+            width, height: Box dimensions
+            text: Translated text to display
+            duration: Display duration in milliseconds
+        """
+        self.clear_translations()
+        self.add_translation(x, y, width, height, text)
+        self.show()
+
+        # Auto-hide after duration
+        if duration > 0:
+            QTimer.singleShot(duration, self.hide)
+
+    def update_config(self, config: dict):
+        """Update overlay configuration"""
+        self.config = config
+        self._setup_window()
+        self.update()
+
+
+class RegionSelector(QWidget):
+    """Widget for selecting screen region to capture"""
+
+    def __init__(self):
+        super().__init__()
+        self.begin_pos = None
+        self.end_pos = None
+        self.is_selecting = False
+        self.selected_region = None
+        self._setup_window()
+
+    def _setup_window(self):
+        """Setup the region selector window"""
+        self.setWindowFlags(
+            Qt.WindowStaysOnTopHint |
+            Qt.FramelessWindowHint |
+            Qt.Tool
+        )
+
+        # Make semi-transparent
+        self.setWindowOpacity(0.3)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+
+        # Cover entire screen
+        screen = QApplication.primaryScreen().geometry()
+        self.setGeometry(screen)
+
+        # Set background color
+        palette = self.palette()
+        palette.setColor(QPalette.Window, QColor(0, 0, 0, 128))
+        self.setPalette(palette)
+        self.setAutoFillBackground(True)
+
+    def mousePressEvent(self, event):
+        """Handle mouse press to start selection"""
+        if event.button() == Qt.LeftButton:
+            self.begin_pos = event.pos()
+            self.is_selecting = True
+
+    def mouseMoveEvent(self, event):
+        """Handle mouse move during selection"""
+        if self.is_selecting:
+            self.end_pos = event.pos()
+            self.update()
+
+    def mouseReleaseEvent(self, event):
+        """Handle mouse release to finish selection"""
+        if event.button() == Qt.LeftButton and self.is_selecting:
+            self.end_pos = event.pos()
+            self.is_selecting = False
+
+            # Calculate selected region
+            if self.begin_pos and self.end_pos:
+                x = min(self.begin_pos.x(), self.end_pos.x())
+                y = min(self.begin_pos.y(), self.end_pos.y())
+                width = abs(self.end_pos.x() - self.begin_pos.x())
+                height = abs(self.end_pos.y() - self.begin_pos.y())
+
+                if width > 10 and height > 10:  # Minimum size
+                    self.selected_region = (x, y, width, height)
+
+            self.close()
+
+    def paintEvent(self, event):
+        """Draw selection rectangle"""
+        super().paintEvent(event)
+
+        if self.begin_pos and self.end_pos and self.is_selecting:
+            painter = QPainter(self)
+            painter.setRenderHint(QPainter.Antialiasing)
+
+            # Draw selection rectangle
+            pen = QPen(QColor(0, 255, 0), 2)
+            painter.setPen(pen)
+
+            x = min(self.begin_pos.x(), self.end_pos.x())
+            y = min(self.begin_pos.y(), self.end_pos.y())
+            width = abs(self.end_pos.x() - self.begin_pos.x())
+            height = abs(self.end_pos.y() - self.begin_pos.y())
+
+            painter.drawRect(x, y, width, height)
+
+    def get_selected_region(self) -> Optional[Tuple[int, int, int, int]]:
+        """Get the selected region coordinates"""
+        return self.selected_region
+
+    def keyPressEvent(self, event):
+        """Handle Escape key to cancel selection"""
+        if event.key() == Qt.Key_Escape:
+            self.selected_region = None
+            self.close()
