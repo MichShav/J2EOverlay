@@ -51,7 +51,7 @@ sudo dnf install tesseract tesseract-langpack-jpn
 ### 2. Clone Repository
 
 ```bash
-git clone https://github.com/yourusername/J2EOverlay.git
+git clone https://github.com/MichShav/J2EOverlay.git
 cd J2EOverlay
 ```
 
@@ -336,8 +336,8 @@ MIT License - feel free to use and modify.
 ## Support
 
 For issues and questions:
-- GitHub Issues: https://github.com/yourusername/J2EOverlay/issues
-- Discussions: https://github.com/yourusername/J2EOverlay/discussions
+- GitHub Issues: https://github.com/MichShav/J2EOverlay/issues
+- Discussions: https://github.com/MichShav/J2EOverlay/discussions
 
 ## Roadmap
 
