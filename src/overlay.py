@@ -1,9 +1,10 @@
 """Transparent overlay window for displaying translations"""
 
-from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QApplication
+from typing import Optional, Tuple
+
+from PyQt5.QtWidgets import QWidget, QDialog, QApplication
 from PyQt5.QtCore import Qt, QRect, QTimer
 from PyQt5.QtGui import QPalette, QColor, QFont, QPainter, QPen
-from typing import Optional, Tuple
 
 
 class TranslationOverlay(QWidget):
@@ -62,16 +63,27 @@ class TranslationOverlay(QWidget):
 
     def add_translation(self, x: int, y: int, width: int, height: int, text: str):
         """
-        Add a translation box to display
+        Add a translation box to display.
 
         Args:
-            x, y: Top-left coordinates
+            x, y: Top-left coordinates (logical screen coordinates)
             width, height: Box dimensions
             text: Translated text to display
         """
         rect = QRect(x, y, width, height)
         self.translation_boxes.append((rect, text))
         self.update()  # Trigger repaint
+
+    def set_translations(self, boxes):
+        """Replace all translation boxes in one repaint.
+
+        Args:
+            boxes: iterable of (x, y, width, height, text) tuples
+        """
+        self.translation_boxes = [
+            (QRect(x, y, w, h), text) for x, y, w, h, text in boxes
+        ]
+        self.update()
 
     def clear_translations(self):
         """Clear all translation boxes"""
@@ -110,9 +122,10 @@ class TranslationOverlay(QWidget):
                 text
             )
 
-    def show_translation(self, x: int, y: int, width: int, height: int, text: str, duration: int = 5000):
+    def show_translation(self, x: int, y: int, width: int, height: int,
+                         text: str, duration: int = 5000):
         """
-        Show a translation for a specified duration
+        Show a single translation for a specified duration.
 
         Args:
             x, y: Top-left coordinates
@@ -130,13 +143,21 @@ class TranslationOverlay(QWidget):
 
     def update_config(self, config: dict):
         """Update overlay configuration"""
+        was_visible = self.isVisible()
         self.config = config
         self._setup_window()
+        # setWindowFlags() hides the window; restore visibility
+        if was_visible:
+            self.show()
         self.update()
 
 
-class RegionSelector(QWidget):
-    """Widget for selecting screen region to capture"""
+class RegionSelector(QDialog):
+    """Dialog for selecting a screen region to capture.
+
+    Must be a QDialog (not a plain QWidget) so exec_() exists and blocks
+    until the user finishes or cancels the selection.
+    """
 
     def __init__(self):
         super().__init__()
@@ -156,7 +177,6 @@ class RegionSelector(QWidget):
 
         # Make semi-transparent
         self.setWindowOpacity(0.3)
-        self.setAttribute(Qt.WA_TranslucentBackground)
 
         # Cover entire screen
         screen = QApplication.primaryScreen().geometry()
@@ -167,6 +187,8 @@ class RegionSelector(QWidget):
         palette.setColor(QPalette.Window, QColor(0, 0, 0, 128))
         self.setPalette(palette)
         self.setAutoFillBackground(True)
+
+        self.setCursor(Qt.CrossCursor)
 
     def mousePressEvent(self, event):
         """Handle mouse press to start selection"""
@@ -196,7 +218,7 @@ class RegionSelector(QWidget):
                 if width > 10 and height > 10:  # Minimum size
                     self.selected_region = (x, y, width, height)
 
-            self.close()
+            self.accept() if self.selected_region else self.reject()
 
     def paintEvent(self, event):
         """Draw selection rectangle"""
@@ -218,11 +240,11 @@ class RegionSelector(QWidget):
             painter.drawRect(x, y, width, height)
 
     def get_selected_region(self) -> Optional[Tuple[int, int, int, int]]:
-        """Get the selected region coordinates"""
+        """Get the selected region coordinates (logical screen coords)"""
         return self.selected_region
 
     def keyPressEvent(self, event):
         """Handle Escape key to cancel selection"""
         if event.key() == Qt.Key_Escape:
             self.selected_region = None
-            self.close()
+            self.reject()

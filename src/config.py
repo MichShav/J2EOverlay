@@ -1,8 +1,11 @@
 """Configuration management for J2EOverlay"""
 
 import json
+import logging
 import os
 from typing import Dict, Any
+
+logger = logging.getLogger(__name__)
 
 
 class Config:
@@ -18,13 +21,13 @@ class Config:
             try:
                 with open(self.config_path, 'r', encoding='utf-8') as f:
                     return json.load(f)
-            except Exception as e:
-                print(f"Error loading config: {e}")
+            except Exception:
+                logger.exception("Error loading config, using defaults")
                 return self._get_default_config()
         return self._get_default_config()
 
     def _get_default_config(self) -> Dict[str, Any]:
-        """Return default configuration"""
+        """Return default configuration (kept in sync with config.json)"""
         return {
             "hotkey": {
                 "capture": "<ctrl>+<shift>+t",
@@ -34,12 +37,15 @@ class Config:
             "ocr": {
                 "language": "jpn",
                 "tesseract_path": "",
-                "confidence_threshold": 60
+                "confidence_threshold": 60,
+                "psm": 6,
+                "upscale": 2
             },
             "translation": {
                 "source_lang": "ja",
                 "target_lang": "en",
-                "service": "google"
+                "service": "sugoi",
+                "model_path": ""
             },
             "overlay": {
                 "font_size": 14,
@@ -65,8 +71,8 @@ class Config:
             with open(self.config_path, 'w', encoding='utf-8') as f:
                 json.dump(self.settings, f, indent=2)
             return True
-        except Exception as e:
-            print(f"Error saving config: {e}")
+        except Exception:
+            logger.exception("Error saving config")
             return False
 
     def get(self, key_path: str, default: Any = None) -> Any:

@@ -7,7 +7,9 @@
   "ocr": {
     "language": "jpn",
     "tesseract_path": "",
-    "confidence_threshold": 60
+    "confidence_threshold": 60,
+    "psm": 6,
+    "upscale": 2
   },
   "translation": {
     "source_lang": "ja",

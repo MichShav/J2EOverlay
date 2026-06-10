@@ -97,7 +97,7 @@ The models are cached locally in your user directory and only need to be downloa
 python main.py
 ```
 
-The application will start in the system tray.
+The application will start in the system tray. The translation model loads in the background — a tray notification appears when it's ready. For verbose logs (useful for bug reports), run `python main.py --debug`.
 
 ### Basic Workflow
 
@@ -146,13 +146,17 @@ Edit `config.json` to customize settings:
 "ocr": {
   "language": "jpn",
   "tesseract_path": "",
-  "confidence_threshold": 60
+  "confidence_threshold": 60,
+  "psm": 6,
+  "upscale": 2
 }
 ```
 
-- `language`: OCR language (jpn for Japanese)
+- `language`: OCR language (`jpn` for Japanese; use `jpn+jpn_vert` to also detect vertical text)
 - `tesseract_path`: Custom Tesseract executable path (leave empty for auto-detect)
 - `confidence_threshold`: Minimum OCR confidence (0-100)
+- `psm`: Tesseract page segmentation mode (`6` = uniform block, best for a selected dialogue region; `11` = sparse text, better for full-screen capture)
+- `upscale`: Upscale factor applied before OCR (game text is usually too small for Tesseract at native size)
 
 ### Translation Settings
 
@@ -329,7 +333,8 @@ MIT License - feel free to use and modify.
 ## Acknowledgments
 
 - Tesseract OCR for text recognition
-- deep-translator for translation services
+- FuguMT (staka) and Helsinki-NLP OPUS-MT for translation models
+- Hugging Face Transformers for model inference
 - PyQt5 for GUI framework
 - mss for screen capture
 
@@ -341,8 +346,9 @@ For issues and questions:
 
 ## Roadmap
 
+- [x] Offline translation with local models
 - [ ] Support for additional translation services (DeepL, Azure)
-- [ ] Offline translation with local models
+- [ ] manga-ocr backend for stylized game fonts
 - [ ] Multiple language support
 - [ ] Custom dictionary/glossary
 - [ ] Translation history
