@@ -195,9 +195,6 @@ Customize colors, fonts, and transparency to your preference.
 
 ```json
 "capture": {
-  "mode": "region",
-  "monitor": 0,
-  "auto_detect": true,
   "scan_interval": 1000
 }
 ```

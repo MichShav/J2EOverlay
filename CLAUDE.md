@@ -119,7 +119,8 @@ There are NO automated tests in the repo yet. The current code was verified by:
 
 - Overlay box alignment on a high-DPI / scaled Windows display.
 - Multi-monitor behavior (overlay covers primary screen only; mss monitor
-  index handling is simplistic; `capture.monitor` config key is currently unused).
+  index handling is simplistic; a monitor-selection config key would need
+  to be reintroduced alongside overlay/DPI changes).
 - `--psm 11` vs `--psm 6` quality for full-screen capture.
 - GlobalHotKeys on Wayland (pynput global hooks often don't work there —
   tray menu is the fallback).

@@ -58,9 +58,6 @@ class Config:
                 "padding": 10
             },
             "capture": {
-                "mode": "region",
-                "monitor": 0,
-                "auto_detect": True,
                 "scan_interval": 1000
             }
         }
