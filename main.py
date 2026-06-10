@@ -89,6 +89,10 @@ class J2EOverlayApp:
         self.worker.no_change.connect(self._on_no_change)
         self.worker.error.connect(self._on_error)
         self.worker.initialized.connect(self._on_worker_initialized)
+        # Direct connection: runs on the worker thread as it finishes,
+        # releasing the mss instance on the thread that owns it
+        self.worker_thread.finished.connect(
+            self.worker.shutdown, Qt.DirectConnection)
         self.worker_thread.start()
 
         # Setup system tray
@@ -192,8 +196,18 @@ class J2EOverlayApp:
 
     def select_region(self):
         """Open region selector to choose capture area"""
-        selector = RegionSelector()
-        result = selector.exec_()
+        # Pause auto-capture while the selector covers the screen, so the
+        # pipeline never OCRs the dimmed selection overlay itself
+        timer_was_active = (self.auto_capture_timer is not None
+                            and self.auto_capture_timer.isActive())
+        if timer_was_active:
+            self.auto_capture_timer.stop()
+        try:
+            selector = RegionSelector()
+            result = selector.exec_()
+        finally:
+            if timer_was_active and self.auto_capture_timer is not None:
+                self.auto_capture_timer.start()
 
         region = selector.get_selected_region()
         if result == QDialog.Accepted and region:
@@ -284,6 +298,7 @@ class J2EOverlayApp:
             self.auto_capture_timer = QTimer()
             self.auto_capture_timer.timeout.connect(self.capture_and_translate)
             self.auto_capture_timer.start(interval)
+            self.auto_capture_action.setText("Disable Auto-Capture")
             logger.info("Auto-capture enabled (interval: %dms)", interval)
             self.tray_icon.showMessage(
                 "Auto-Capture Enabled",
@@ -295,6 +310,7 @@ class J2EOverlayApp:
             if self.auto_capture_timer:
                 self.auto_capture_timer.stop()
                 self.auto_capture_timer = None
+            self.auto_capture_action.setText("Enable Auto-Capture")
             logger.info("Auto-capture disabled")
             self.tray_icon.showMessage(
                 "Auto-Capture Disabled",
@@ -315,7 +331,13 @@ class J2EOverlayApp:
         if self.keyboard_listener:
             self.keyboard_listener.stop()
         self.worker_thread.quit()
-        self.worker_thread.wait(3000)
+        # The first capture can hold the worker for a long time loading
+        # the model; give it a generous window, then terminate rather
+        # than destroy a running QThread (which can crash on exit)
+        if not self.worker_thread.wait(15000):
+            logger.warning("Worker thread did not stop in time; terminating")
+            self.worker_thread.terminate()
+            self.worker_thread.wait(2000)
         self.overlay.close()
         self.tray_icon.hide()
         self.app.quit()

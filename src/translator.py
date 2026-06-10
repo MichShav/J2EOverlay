@@ -16,11 +16,19 @@ class Translator:
     """Handles translation operations with offline support"""
 
     def __init__(self, source_lang: str = "ja", target_lang: str = "en",
-                 service: str = "sugoi", model_path: Optional[str] = None):
+                 model_path: Optional[str] = None, fp16: bool = False):
+        """
+        Args:
+            model_path: Custom local model directory (overrides defaults)
+            fp16: Run the model in half precision on CUDA. Roughly
+                doubles GPU throughput, but Marian-style models can
+                occasionally emit NaNs in fp16 (blank translations), so
+                this is opt-in.
+        """
         self.source_lang = source_lang
         self.target_lang = target_lang
-        self.service = service
         self.model_path = model_path
+        self.fp16 = fp16
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.translator = None
         self.tokenizer = None
@@ -66,8 +74,8 @@ class Translator:
                 self.model_name = model_name
                 break
             except Exception as e:
-                logger.debug("Could not load %s (local_only=%s): %s",
-                             model_name, local_only, e)
+                logger.info("Could not load %s (local_only=%s): %s",
+                            model_name, local_only, e)
                 self.tokenizer = None
                 self.translator = None
 
@@ -77,9 +85,7 @@ class Translator:
             return
 
         self.translator.to(self.device)
-        if self.device == "cuda":
-            # fp16 roughly doubles throughput on GPU with negligible
-            # quality loss for Marian-style models
+        if self.device == "cuda" and self.fp16:
             self.translator.half()
         self.translator.eval()
         logger.info("Translation model '%s' loaded on %s",
@@ -177,7 +183,7 @@ class Translator:
         return {
             "status": "loaded",
             "device": self.device,
-            "service": self.service,
+            "fp16": self.fp16,
             "model": self.model_name,
             "model_path": self.model_path if self.model_path else "default",
             "cuda_available": torch.cuda.is_available(),

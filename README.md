@@ -19,7 +19,7 @@ A transparent overlay application that translates Japanese text to English in re
 
 - Python 3.7 or higher
 - Tesseract OCR 4.0 or higher with Japanese language data
-- ~2-3GB disk space for translation models
+- ~1GB disk space for translation models
 - Internet connection (one-time only, for downloading models)
 
 ## Installation
@@ -77,7 +77,7 @@ pip install -r requirements.txt
 
 ### 4. Download Translation Models
 
-**IMPORTANT**: This is a one-time download (~2GB) and requires internet connection. After download, the app works completely offline.
+**IMPORTANT**: This is a one-time download (~400MB) and requires internet connection. After download, the app works completely offline.
 
 ```bash
 python download_models.py
@@ -164,15 +164,15 @@ Edit `config.json` to customize settings:
 "translation": {
   "source_lang": "ja",
   "target_lang": "en",
-  "service": "sugoi",
-  "model_path": ""
+  "model_path": "",
+  "fp16": false
 }
 ```
 
 - `source_lang`: Source language code (ja = Japanese)
 - `target_lang`: Target language code (en = English)
-- `service`: Translation service ("sugoi" for offline, "offline" also works)
 - `model_path`: Custom model path (leave empty to use default downloaded models)
+- `fp16`: Run the model in half precision on GPU (faster, but can occasionally produce blank translations on some hardware — leave off unless you need the speed)
 
 ### Overlay Appearance
 
@@ -247,7 +247,7 @@ which tesseract
 
 - Ensure translation models were downloaded (run `python download_models.py`)
 - Check console output for model loading errors
-- Verify sufficient disk space (~2-3GB needed)
+- Verify sufficient disk space (~1GB needed)
 - For GPU acceleration: Ensure CUDA is installed and compatible with PyTorch
 - Try restarting the application after model download
 
@@ -312,6 +312,7 @@ J2EOverlay/
 ├── src/
 │   ├── __init__.py
 │   ├── config.py        # Configuration manager
+│   ├── pipeline.py      # Background worker (capture -> OCR -> translate)
 │   ├── screen_capture.py # Screen capture module
 │   ├── ocr_engine.py    # OCR processing
 │   ├── translator.py    # Translation service

@@ -3,7 +3,7 @@
 from typing import Optional, Tuple
 
 from PyQt5.QtWidgets import QWidget, QDialog, QApplication
-from PyQt5.QtCore import Qt, QRect, QTimer
+from PyQt5.QtCore import Qt, QRect
 from PyQt5.QtGui import QPalette, QColor, QFont, QPainter, QPen
 
 
@@ -38,8 +38,9 @@ class TranslationOverlay(QWidget):
         # Don't show in taskbar
         self.setAttribute(Qt.WA_X11DoNotAcceptFocus, True)
 
-        # Set up font and colors
-        self.font = QFont(
+        # Set up font and colors. Named overlay_font (not font) so it
+        # does not shadow QWidget.font().
+        self.overlay_font = QFont(
             self.config.get('overlay', {}).get('font_family', 'Arial'),
             self.config.get('overlay', {}).get('font_size', 14)
         )
@@ -60,19 +61,6 @@ class TranslationOverlay(QWidget):
 
         self.border_width = self.config.get('overlay', {}).get('border_width', 2)
         self.padding = self.config.get('overlay', {}).get('padding', 10)
-
-    def add_translation(self, x: int, y: int, width: int, height: int, text: str):
-        """
-        Add a translation box to display.
-
-        Args:
-            x, y: Top-left coordinates (logical screen coordinates)
-            width, height: Box dimensions
-            text: Translated text to display
-        """
-        rect = QRect(x, y, width, height)
-        self.translation_boxes.append((rect, text))
-        self.update()  # Trigger repaint
 
     def set_translations(self, boxes):
         """Replace all translation boxes in one repaint.
@@ -97,7 +85,7 @@ class TranslationOverlay(QWidget):
 
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
-        painter.setFont(self.font)
+        painter.setFont(self.overlay_font)
 
         for rect, text in self.translation_boxes:
             # Draw background
@@ -121,25 +109,6 @@ class TranslationOverlay(QWidget):
                 Qt.AlignLeft | Qt.AlignTop | Qt.TextWordWrap,
                 text
             )
-
-    def show_translation(self, x: int, y: int, width: int, height: int,
-                         text: str, duration: int = 5000):
-        """
-        Show a single translation for a specified duration.
-
-        Args:
-            x, y: Top-left coordinates
-            width, height: Box dimensions
-            text: Translated text to display
-            duration: Display duration in milliseconds
-        """
-        self.clear_translations()
-        self.add_translation(x, y, width, height, text)
-        self.show()
-
-        # Auto-hide after duration
-        if duration > 0:
-            QTimer.singleShot(duration, self.hide)
 
     def update_config(self, config: dict):
         """Update overlay configuration"""
@@ -218,7 +187,10 @@ class RegionSelector(QDialog):
                 if width > 10 and height > 10:  # Minimum size
                     self.selected_region = (x, y, width, height)
 
-            self.accept() if self.selected_region else self.reject()
+            if self.selected_region:
+                self.accept()
+            else:
+                self.reject()
 
     def paintEvent(self, event):
         """Draw selection rectangle"""

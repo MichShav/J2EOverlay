@@ -4,14 +4,16 @@ Model downloader for J2EOverlay
 Downloads the offline translation models
 """
 
+import argparse
 import sys
-import os
 
 
 def download_translation_model():
     """Download the offline Japanese-English translation model"""
     try:
         from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+        # Single source of truth for model names, shared with the app
+        from src.translator import PRIMARY_MODEL, FALLBACK_MODEL
 
         print("=" * 60)
         print("J2EOverlay - Model Downloader")
@@ -19,9 +21,9 @@ def download_translation_model():
         print()
 
         # Try game-optimized model first
-        model_name = "staka/fugumt-ja-en"
+        model_name = PRIMARY_MODEL
         print(f"Downloading game-optimized translation model: {model_name}")
-        print("This is a ~2GB download and may take several minutes...")
+        print("This is a ~400MB download and may take several minutes...")
         print()
 
         try:
@@ -46,7 +48,7 @@ def download_translation_model():
             print()
             print("Falling back to Helsinki-NLP opus-mt-ja-en model...")
 
-            model_name = "Helsinki-NLP/opus-mt-ja-en"
+            model_name = FALLBACK_MODEL
             print(f"Downloading: {model_name}")
             print("This is a ~300MB download...")
             print()
@@ -107,6 +109,11 @@ def download_tesseract_data():
 
 def main():
     """Main entry point"""
+    parser = argparse.ArgumentParser(description="J2EOverlay model downloader")
+    parser.add_argument("-y", "--yes", action="store_true",
+                        help="Skip the confirmation prompt (for scripted installs)")
+    args = parser.parse_args()
+
     print()
     print("J2EOverlay - First-time Setup")
     print()
@@ -114,10 +121,11 @@ def main():
     print("These models will be cached locally for offline use.")
     print()
 
-    response = input("Continue? (y/n): ").strip().lower()
-    if response not in ['y', 'yes']:
-        print("Setup cancelled.")
-        return
+    if not args.yes:
+        response = input("Continue? (y/n): ").strip().lower()
+        if response not in ['y', 'yes']:
+            print("Setup cancelled.")
+            return
 
     print()
 

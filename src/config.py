@@ -44,8 +44,8 @@ class Config:
             "translation": {
                 "source_lang": "ja",
                 "target_lang": "en",
-                "service": "sugoi",
-                "model_path": ""
+                "model_path": "",
+                "fp16": False
             },
             "overlay": {
                 "font_size": 14,
@@ -91,7 +91,7 @@ class Config:
         keys = key_path.split('.')
         config = self.settings
         for key in keys[:-1]:
-            if key not in config:
+            if not isinstance(config.get(key), dict):
                 config[key] = {}
             config = config[key]
         config[keys[-1]] = value

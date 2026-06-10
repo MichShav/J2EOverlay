@@ -61,8 +61,8 @@ class TranslationWorker(QObject):
         self.translator = Translator(
             source_lang=self.config.get('translation.source_lang', 'ja'),
             target_lang=self.config.get('translation.target_lang', 'en'),
-            service=self.config.get('translation.service', 'sugoi'),
             model_path=self.config.get('translation.model_path', ''),
+            fp16=self.config.get('translation.fp16', False),
         )
         self.initialized.emit(self.translator.device)
 
@@ -96,7 +96,7 @@ class TranslationWorker(QObject):
                 return
 
             # Skip identical frames entirely (no OCR, no overlay flicker)
-            sig = self._frame_signature(image)
+            sig = self._frame_signature(image, full_screen=region is None)
             if sig == self._last_frame_sig:
                 self.no_change.emit()
                 return
@@ -115,7 +115,6 @@ class TranslationWorker(QObject):
                 for jp, en in zip(pending, translations):
                     if en and self.translator.is_valid_translation(jp, en):
                         self._cache[jp] = en
-                        self._cache.move_to_end(jp)
                 while len(self._cache) > CACHE_MAX_ENTRIES:
                     self._cache.popitem(last=False)
 
@@ -124,6 +123,8 @@ class TranslationWorker(QObject):
                 en = self._cache.get(b['text'])
                 if not en:
                     continue
+                # Keep recurring text fresh so eviction is true LRU
+                self._cache.move_to_end(b['text'])
                 results.append((
                     int(ox + b['x'] / self.dpr),
                     int(oy + b['y'] / self.dpr),
@@ -144,12 +145,22 @@ class TranslationWorker(QObject):
         (e.g. after the user changes the capture region)."""
         self._last_frame_sig = None
 
-    def _frame_signature(self, image) -> str:
+    def _frame_signature(self, image, full_screen: bool = False) -> str:
         """Cheap signature of a frame: downscale + grayscale + hash.
 
         Exact matching is deliberately strict: animated scenes rarely
         match, but the translation cache absorbs the repeated text, which
-        is where the real cost is.
+        is where the real cost is. Full-screen captures use a larger
+        thumbnail so a one-line dialogue change in a corner of the screen
+        is not quantized away.
         """
-        small = image.resize((64, 36)).convert('L')
+        size = (192, 108) if full_screen else (64, 36)
+        small = image.resize(size).convert('L')
         return hashlib.md5(small.tobytes()).hexdigest()
+
+    def shutdown(self):
+        """Release worker-owned resources. Connected to QThread.finished
+        with a direct connection so it runs on the worker thread itself,
+        respecting mss thread affinity."""
+        if self.screen_capture is not None:
+            self.screen_capture.close()

@@ -56,10 +56,11 @@ Invariants that MUST hold:
   ≥ 30% Japanese chars (filters OCR noise).
 - `src/translator.py` — offline-first model loading order: custom path →
   fugumt (local cache) → opus-mt (local cache) → fugumt (network, last
-  resort, with a message pointing at `download_models.py`). fp16 on CUDA,
-  `inference_mode`, `num_beams=4`, `no_repeat_ngram_size=3`, truncation at
-  512, warm-up inference at init. `translate()` routes through
-  `translate_batch()` — keep one code path.
+  resort, with a message pointing at `download_models.py`). Optional fp16
+  on CUDA (`translation.fp16`, off by default — Marian models can emit
+  NaNs in half precision), `inference_mode`, `num_beams=4`,
+  `no_repeat_ngram_size=3`, truncation at 512, warm-up inference at init.
+  `translate()` routes through `translate_batch()` — keep one code path.
 - `src/overlay.py` — `TranslationOverlay` (paint-event rendering;
   `set_translations()` replaces all boxes in one repaint) and
   `RegionSelector` (**must remain a `QDialog`** — `main.py` calls `exec_()`).
@@ -71,7 +72,7 @@ Invariants that MUST hold:
 - `src/config.py` — JSON config with dot-notation `get()`. Defaults must stay
   in sync with `config.json` (they drifted once: default service said
   "google" while config.json said "sugoi").
-- `download_models.py` — one-time model download script (~2GB fugumt,
+- `download_models.py` — one-time model download script (~400MB fugumt,
   ~300MB opus-mt fallback).
 
 ## Historical bugs — do not reintroduce
@@ -85,6 +86,9 @@ Invariants that MUST hold:
 7. `translate()` missing `truncation=True` (batch path had it, single didn't).
 8. Tray icon with no icon set → invisible on Windows; icon is generated at
    runtime in `make_tray_icon()`.
+9. `TranslationOverlay` attribute named `font` shadowed `QWidget.font()`;
+   it is now `overlay_font`. Same rule as `ScreenCapture`: never name an
+   instance attribute after a Qt method.
 
 ## Running & debugging
 
@@ -131,8 +135,8 @@ coordinate logic is pure and easily testable.
 - `ocr.language` (`jpn`, or `jpn+jpn_vert` for vertical text),
   `ocr.psm` (6 = region, 11 = full screen), `ocr.confidence_threshold` (0–100),
   `ocr.upscale` (int ≥ 1), `ocr.tesseract_path`.
-- `translation.service` — `"sugoi"`/`"offline"` both load the local HF model;
-  `translation.model_path` for a custom local model dir.
+- `translation.model_path` — custom local model dir;
+  `translation.fp16` — half precision on CUDA (off by default, NaN risk).
 - `overlay.*` — colors/font/opacity, read once at startup.
 - `capture.scan_interval` — auto-capture period in ms.
 

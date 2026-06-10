@@ -14,8 +14,8 @@
   "translation": {
     "source_lang": "ja",
     "target_lang": "en",
-    "service": "sugoi",
-    "model_path": ""
+    "model_path": "",
+    "fp16": false
   },
   "overlay": {
     "font_size": 14,

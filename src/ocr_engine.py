@@ -161,10 +161,12 @@ class OCREngine:
         for char in stripped:
             code = ord(char)
             # Hiragana: 3040-309F, Katakana: 30A0-30FF (incl. chōonpu),
-            # CJK ideographs: 4E00-9FFF, iteration mark 々: 3005
+            # CJK ideographs: 4E00-9FFF, iteration mark 々: 3005,
+            # half-width katakana FF66-FF9F (common in retro games)
             if (0x3040 <= code <= 0x309F or
                     0x30A0 <= code <= 0x30FF or
                     0x4E00 <= code <= 0x9FFF or
-                    code == 0x3005):
+                    code == 0x3005 or
+                    0xFF66 <= code <= 0xFF9F):
                 japanese += 1
         return japanese > 0 and (japanese / len(stripped)) >= 0.3
