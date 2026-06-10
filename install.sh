@@ -69,7 +69,7 @@ echo ""
 python download_models.py --yes
 if [ $? -ne 0 ]; then
     echo "Warning: Model download failed. You can try again later by running:"
-    echo "  python download_models.py"
+    echo "  python download_models.py --yes"
 fi
 
 echo ""

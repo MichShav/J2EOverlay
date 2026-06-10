@@ -64,7 +64,10 @@ class TranslationWorker(QObject):
             model_path=self.config.get('translation.model_path', ''),
             fp16=self.config.get('translation.fp16', False),
         )
-        self.initialized.emit(self.translator.device)
+        # Only announce success; if the model failed to load, process()
+        # emits a proper error instead of a misleading "ready" toast
+        if self.translator.is_initialized():
+            self.initialized.emit(self.translator.device)
 
     @pyqtSlot(object)
     def process(self, region):

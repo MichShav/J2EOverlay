@@ -124,6 +124,14 @@ There are NO automated tests in the repo yet. The current code was verified by:
 - `--psm 11` vs `--psm 6` quality for full-screen capture.
 - GlobalHotKeys on Wayland (pynput global hooks often don't work there —
   tray menu is the fallback).
+- **Whether mss captures the overlay window itself.** If it does (likely
+  on X11; on Windows, GDI BitBlt normally skips layered windows), auto-
+  capture enters a feedback loop: the overlay covers the Japanese text,
+  the next OCR pass finds nothing, the overlay clears, the text is
+  re-detected, the overlay redraws — visible blinking every tick. The fix
+  would be hide-overlay → short delay → capture → show, coordinated from
+  the main thread. Do not implement it blind; verify the problem exists
+  on the target platform first.
 - End-to-end run with real Tesseract + models.
 
 A proper pytest suite for `ocr_engine` (with a stubbed `pytesseract`) and
