@@ -59,12 +59,12 @@ if %errorlevel% neq 0 (
 REM Download translation models
 echo.
 echo [5/5] Downloading translation models...
-echo This will download ~2GB of data and may take several minutes.
+echo This will download ~400MB of data and may take several minutes.
 echo.
-python download_models.py
+python download_models.py --yes
 if %errorlevel% neq 0 (
     echo Warning: Model download failed. You can try again later by running:
-    echo   python download_models.py
+    echo   python download_models.py --yes
 )
 
 echo.

@@ -19,7 +19,7 @@ A transparent overlay application that translates Japanese text to English in re
 
 - Python 3.7 or higher
 - Tesseract OCR 4.0 or higher with Japanese language data
-- ~2-3GB disk space for translation models
+- ~1GB disk space for translation models
 - Internet connection (one-time only, for downloading models)
 
 ## Installation
@@ -77,7 +77,7 @@ pip install -r requirements.txt
 
 ### 4. Download Translation Models
 
-**IMPORTANT**: This is a one-time download (~2GB) and requires internet connection. After download, the app works completely offline.
+**IMPORTANT**: This is a one-time download (~400MB) and requires internet connection. After download, the app works completely offline.
 
 ```bash
 python download_models.py
@@ -97,7 +97,7 @@ The models are cached locally in your user directory and only need to be downloa
 python main.py
 ```
 
-The application will start in the system tray.
+The application will start in the system tray. The translation model loads in the background — a tray notification appears when it's ready. For verbose logs (useful for bug reports), run `python main.py --debug`.
 
 ### Basic Workflow
 
@@ -146,13 +146,17 @@ Edit `config.json` to customize settings:
 "ocr": {
   "language": "jpn",
   "tesseract_path": "",
-  "confidence_threshold": 60
+  "confidence_threshold": 60,
+  "psm": 6,
+  "upscale": 2
 }
 ```
 
-- `language`: OCR language (jpn for Japanese)
+- `language`: OCR language (`jpn` for Japanese; use `jpn+jpn_vert` to also detect vertical text)
 - `tesseract_path`: Custom Tesseract executable path (leave empty for auto-detect)
 - `confidence_threshold`: Minimum OCR confidence (0-100)
+- `psm`: Tesseract page segmentation mode (`6` = uniform block, best for a selected dialogue region; `11` = sparse text, better for full-screen capture)
+- `upscale`: Upscale factor applied before OCR (game text is usually too small for Tesseract at native size)
 
 ### Translation Settings
 
@@ -160,15 +164,15 @@ Edit `config.json` to customize settings:
 "translation": {
   "source_lang": "ja",
   "target_lang": "en",
-  "service": "sugoi",
-  "model_path": ""
+  "model_path": "",
+  "fp16": false
 }
 ```
 
 - `source_lang`: Source language code (ja = Japanese)
 - `target_lang`: Target language code (en = English)
-- `service`: Translation service ("sugoi" for offline, "offline" also works)
 - `model_path`: Custom model path (leave empty to use default downloaded models)
+- `fp16`: Run the model in half precision on GPU (faster, but can occasionally produce blank translations on some hardware — leave off unless you need the speed)
 
 ### Overlay Appearance
 
@@ -191,9 +195,6 @@ Customize colors, fonts, and transparency to your preference.
 
 ```json
 "capture": {
-  "mode": "region",
-  "monitor": 0,
-  "auto_detect": true,
   "scan_interval": 1000
 }
 ```
@@ -243,7 +244,7 @@ which tesseract
 
 - Ensure translation models were downloaded (run `python download_models.py`)
 - Check console output for model loading errors
-- Verify sufficient disk space (~2-3GB needed)
+- Verify sufficient disk space (~1GB needed)
 - For GPU acceleration: Ensure CUDA is installed and compatible with PyTorch
 - Try restarting the application after model download
 
@@ -308,6 +309,7 @@ J2EOverlay/
 ├── src/
 │   ├── __init__.py
 │   ├── config.py        # Configuration manager
+│   ├── pipeline.py      # Background worker (capture -> OCR -> translate)
 │   ├── screen_capture.py # Screen capture module
 │   ├── ocr_engine.py    # OCR processing
 │   ├── translator.py    # Translation service
@@ -329,7 +331,8 @@ MIT License - feel free to use and modify.
 ## Acknowledgments
 
 - Tesseract OCR for text recognition
-- deep-translator for translation services
+- FuguMT (staka) and Helsinki-NLP OPUS-MT for translation models
+- Hugging Face Transformers for model inference
 - PyQt5 for GUI framework
 - mss for screen capture
 
@@ -341,8 +344,9 @@ For issues and questions:
 
 ## Roadmap
 
+- [x] Offline translation with local models
 - [ ] Support for additional translation services (DeepL, Azure)
-- [ ] Offline translation with local models
+- [ ] manga-ocr backend for stylized game fonts
 - [ ] Multiple language support
 - [ ] Custom dictionary/glossary
 - [ ] Translation history

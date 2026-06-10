@@ -1,190 +1,178 @@
 """Translation module for Japanese to English translation - Offline support"""
 
+import logging
 import os
-import torch
 from typing import Optional, List
-from pathlib import Path
+
+import torch
+
+logger = logging.getLogger(__name__)
+
+PRIMARY_MODEL = "staka/fugumt-ja-en"
+FALLBACK_MODEL = "Helsinki-NLP/opus-mt-ja-en"
 
 
 class Translator:
     """Handles translation operations with offline support"""
 
     def __init__(self, source_lang: str = "ja", target_lang: str = "en",
-                 service: str = "sugoi", model_path: Optional[str] = None):
+                 model_path: Optional[str] = None, fp16: bool = False):
+        """
+        Args:
+            model_path: Custom local model directory (overrides defaults)
+            fp16: Run the model in half precision on CUDA. Roughly
+                doubles GPU throughput, but Marian-style models can
+                occasionally emit NaNs in fp16 (blank translations), so
+                this is opt-in.
+        """
         self.source_lang = source_lang
         self.target_lang = target_lang
-        self.service = service
         self.model_path = model_path
+        self.fp16 = fp16
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.translator = None
         self.tokenizer = None
+        self.model_name = None
         self._initialize_translator()
 
     def _initialize_translator(self):
-        """Initialize the translation service"""
-        if self.service == "sugoi":
-            self._initialize_sugoi()
-        elif self.service == "offline":
-            self._initialize_offline_model()
-        else:
-            # Fallback to offline model
-            self._initialize_offline_model()
+        """Initialize the translation model.
 
-    def _initialize_sugoi(self):
-        """Initialize Sugoi-compatible offline translation"""
+        Loading order, all offline-first so the app never silently hits
+        the network at startup:
+          1. Custom local model path, if provided
+          2. PRIMARY_MODEL from local cache
+          3. FALLBACK_MODEL from local cache
+          4. PRIMARY_MODEL from network (last resort, with a clear message)
+        """
         try:
             from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-
-            # Use Sugoi-compatible model or best available Japanese game translation model
-            # Priority: 1. Custom Sugoi model if provided
-            #          2. staka/fugumt-ja-en (game-optimized)
-            #          3. Helsinki-NLP/opus-mt-ja-en (fallback)
-
-            if self.model_path and os.path.exists(self.model_path):
-                model_name = self.model_path
-                print(f"Loading custom Sugoi model from: {model_name}")
-            else:
-                # Try game-optimized model first
-                model_name = "staka/fugumt-ja-en"
-                print(f"Loading game-optimized translation model: {model_name}")
-
-            try:
-                self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-                self.translator = AutoModelForSeq2SeqLM.from_pretrained(model_name)
-            except Exception as e:
-                # Fallback to reliable Helsinki model
-                print(f"Failed to load {model_name}, falling back to Helsinki model: {e}")
-                model_name = "Helsinki-NLP/opus-mt-ja-en"
-                self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-                self.translator = AutoModelForSeq2SeqLM.from_pretrained(model_name)
-
-            self.translator.to(self.device)
-            self.translator.eval()  # Set to evaluation mode for faster inference
-
-            print(f"Translation model loaded successfully on {self.device}")
-
         except ImportError:
-            print("ERROR: transformers library not installed!")
-            print("Install with: pip install transformers torch sentencepiece")
-            self.translator = None
-        except Exception as e:
-            print(f"Error initializing Sugoi translator: {e}")
-            self.translator = None
+            logger.error("transformers library not installed! "
+                         "Install with: pip install transformers torch sentencepiece")
+            return
 
-    def _initialize_offline_model(self):
-        """Initialize generic offline translation model"""
-        self._initialize_sugoi()  # Use same implementation
+        candidates = []
+        if self.model_path and os.path.exists(self.model_path):
+            candidates.append((self.model_path, True))
+        candidates.append((PRIMARY_MODEL, True))
+        candidates.append((FALLBACK_MODEL, True))
+        candidates.append((PRIMARY_MODEL, False))  # network, last resort
+
+        for model_name, local_only in candidates:
+            try:
+                if not local_only:
+                    logger.warning(
+                        "No translation model found in the local cache. "
+                        "Attempting a one-time download of %s. "
+                        "(Tip: run 'python download_models.py' beforehand.)",
+                        model_name)
+                self.tokenizer = AutoTokenizer.from_pretrained(
+                    model_name, local_files_only=local_only)
+                self.translator = AutoModelForSeq2SeqLM.from_pretrained(
+                    model_name, local_files_only=local_only)
+                self.model_name = model_name
+                break
+            except Exception as e:
+                logger.info("Could not load %s (local_only=%s): %s",
+                            model_name, local_only, e)
+                self.tokenizer = None
+                self.translator = None
+
+        if self.translator is None:
+            logger.error("Failed to load any translation model. "
+                         "Run 'python download_models.py' first.")
+            return
+
+        self.translator.to(self.device)
+        if self.device == "cuda" and self.fp16:
+            self.translator.half()
+        self.translator.eval()
+        logger.info("Translation model '%s' loaded on %s",
+                    self.model_name, self.device)
+
+        # Warm-up: the first inference pays one-time lazy-init costs
+        # (CUDA kernels etc.); do it now instead of on the user's first capture
+        try:
+            self.translate_batch(["テスト"])
+            logger.debug("Translator warm-up complete")
+        except Exception:
+            logger.exception("Translator warm-up failed")
+
+    def is_initialized(self) -> bool:
+        return self.translator is not None and self.tokenizer is not None
 
     def translate(self, text: str) -> Optional[str]:
         """
-        Translate text from Japanese to English (offline)
-
-        Args:
-            text: Text to translate
-
-        Returns:
-            Translated text or None if translation fails
+        Translate a single text from Japanese to English (offline).
+        Routed through translate_batch so there is one code path.
         """
         if not text or not text.strip():
             return None
-
-        if not self.translator or not self.tokenizer:
-            print("Translator not initialized")
-            return None
-
-        try:
-            # Prepare input
-            inputs = self.tokenizer(text.strip(), return_tensors="pt", padding=True)
-            inputs = {k: v.to(self.device) for k, v in inputs.items()}
-
-            # Generate translation
-            with torch.no_grad():
-                outputs = self.translator.generate(
-                    **inputs,
-                    max_length=512,
-                    num_beams=4,  # Beam search for better quality
-                    early_stopping=True
-                )
-
-            # Decode output
-            translated = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-            return translated.strip()
-
-        except Exception as e:
-            print(f"Translation error: {e}")
-            return None
+        return self.translate_batch([text])[0]
 
     def translate_batch(self, texts: List[str]) -> List[Optional[str]]:
         """
-        Translate multiple texts efficiently
+        Translate multiple texts in a single forward pass.
 
         Args:
             texts: List of texts to translate
 
         Returns:
-            List of translated texts
+            List of translated texts (None for entries that failed or
+            were empty), index-aligned with the input.
         """
         if not texts:
             return []
 
-        if not self.translator or not self.tokenizer:
-            print("Translator not initialized")
+        if not self.is_initialized():
+            logger.error("Translator not initialized")
             return [None] * len(texts)
 
         try:
-            # Filter out empty texts
-            valid_texts = [(i, text.strip()) for i, text in enumerate(texts) if text and text.strip()]
-
-            if not valid_texts:
+            valid = [(i, t.strip()) for i, t in enumerate(texts) if t and t.strip()]
+            if not valid:
                 return [None] * len(texts)
+            indices, clean_texts = zip(*valid)
 
-            indices, clean_texts = zip(*valid_texts)
-
-            # Batch tokenization
             inputs = self.tokenizer(
                 list(clean_texts),
                 return_tensors="pt",
                 padding=True,
                 truncation=True,
-                max_length=512
+                max_length=512,
             )
             inputs = {k: v.to(self.device) for k, v in inputs.items()}
 
-            # Generate translations
-            with torch.no_grad():
+            with torch.inference_mode():
                 outputs = self.translator.generate(
                     **inputs,
                     max_length=512,
                     num_beams=4,
-                    early_stopping=True
+                    early_stopping=True,
+                    # Suppresses the classic Marian failure mode of
+                    # repeating a phrase endlessly on game text
+                    no_repeat_ngram_size=3,
                 )
 
-            # Decode outputs
-            translations = self.tokenizer.batch_decode(outputs, skip_special_tokens=True)
+            translations = self.tokenizer.batch_decode(
+                outputs, skip_special_tokens=True)
 
-            # Map back to original indices
-            results = [None] * len(texts)
+            results: List[Optional[str]] = [None] * len(texts)
             for idx, translation in zip(indices, translations):
                 results[idx] = translation.strip()
-
             return results
 
-        except Exception as e:
-            print(f"Batch translation error: {e}")
+        except Exception:
+            logger.exception("Batch translation error")
             return [None] * len(texts)
 
     def is_valid_translation(self, original: str, translated: str) -> bool:
         """
-        Check if translation is valid (not same as original)
-
-        Args:
-            original: Original text
-            translated: Translated text
-
-        Returns:
-            True if translation is valid
+        Check if a translation is usable: non-empty and not an echo of
+        the input (a known failure mode of Marian-style models).
         """
-        if not translated:
+        if not translated or not translated.strip():
             return False
         return original.strip() != translated.strip()
 
@@ -192,11 +180,11 @@ class Translator:
         """Get information about the loaded model"""
         if not self.translator:
             return {"status": "not_loaded"}
-
         return {
             "status": "loaded",
             "device": self.device,
-            "service": self.service,
+            "fp16": self.fp16,
+            "model": self.model_name,
             "model_path": self.model_path if self.model_path else "default",
-            "cuda_available": torch.cuda.is_available()
+            "cuda_available": torch.cuda.is_available(),
         }

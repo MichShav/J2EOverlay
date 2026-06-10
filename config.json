@@ -7,13 +7,15 @@
   "ocr": {
     "language": "jpn",
     "tesseract_path": "",
-    "confidence_threshold": 60
+    "confidence_threshold": 60,
+    "psm": 6,
+    "upscale": 2
   },
   "translation": {
     "source_lang": "ja",
     "target_lang": "en",
-    "service": "sugoi",
-    "model_path": ""
+    "model_path": "",
+    "fp16": false
   },
   "overlay": {
     "font_size": 14,
@@ -26,9 +28,6 @@
     "padding": 10
   },
   "capture": {
-    "mode": "region",
-    "monitor": 0,
-    "auto_detect": true,
     "scan_interval": 1000
   }
 }
